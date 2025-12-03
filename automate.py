@@ -60,6 +60,7 @@ def write_yaml_with_header(file, data):
     file.write("      - main\n\n")
     
     if 'name' in data:
+        
         del data['name']
     if 'on' in data:
         del data['on']
