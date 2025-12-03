@@ -1,81 +1,125 @@
-name: "Testing"
-
+name: Testing
 on:
   push:
-    branches: [main, github-actions-test]
-    paths-ignore:
-      - "docs/**"
-      - "README.rst"
-      - "LICENSE.md"
-      - ".github/workflows/docs.yml"
-      - ".deepsource.toml"
-      - ".gitignore"
-
-  pull_request:
-    branches: [main]
-    paths-ignore:
-      - "docs/**"
-      - "README.rst"
-      - ".github/workflows/docs.yml"
-      - "LICENSE.md"
-      - ".deepsource.toml"
-      - ".gitignore"
+    branches:
+      - main
 
 jobs:
   build:
-    runs-on: ${{matrix.os}}
-    strategy:
-      matrix:
-        os: [ubuntu-latest]
-        python-version: [3.13]
-        geomstats-backend: ["autograd", "numpy", "pytorch"]
-        test-folder: ["tests/tests_geomstats/", "tests/tests_scripts"]
-      fail-fast: false
     env:
       GEOMSTATS_BACKEND: ${{matrix.geomstats-backend}}
       JUPYTER_PLATFORM_DIRS: 1
-
+    runs-on: ${{matrix.os}}
     steps:
+      - name: Start Energy Measurement
+        uses: green-coding-solutions/eco-ci-energy-estimation@862050e4f01f65b1436e5eca18ba4bd85562f0de
+        with:
+          json-output: true
+          task: start-measurement
       - uses: actions/checkout@v4
       - name: Build using Python ${{matrix.python-version}} and Backend ${{matrix.geomstats-backend}}
         uses: actions/setup-python@v5
         with:
           python-version: ${{matrix.python-version}}
-
       - uses: actions/cache@v4
         with:
+          key: ${{matrix.geomstats-backend}}-${{matrix.os}}-${{matrix.python-version}}-${{matrix.test-folder}}-${{
+            hashFiles('pyproject.toml') }}
           path: ~/.cache/pip
-          key: ${{matrix.geomstats-backend}}-${{matrix.os}}-${{matrix.python-version}}-${{matrix.test-folder}}-${{ hashFiles('pyproject.toml') }}
-
       - name: install dependencies [pip]
-        run: |
-          pip install --upgrade pip setuptools wheel
+        run: 'pip install --upgrade pip setuptools wheel
+
           pip install -e .[opt,test,ci,${{ matrix.geomstats-backend }}]
 
-      - name: install (extra) dependencies [pip]
-        if: ${{matrix.test-folder == 'tests/tests_scripts'}}
-        run: |
-          pip install -e .[test-scripts]
+          '
+      - id: measurement-5
+        name: Record Measurement After install dependencies [pip]
+        uses: green-coding-solutions/eco-ci-energy-estimation@862050e4f01f65b1436e5eca18ba4bd85562f0de
+        with:
+          json-output: true
+          label: install dependencies [pip]
+          task: get-measurement
+      - if: ${{matrix.test-folder == 'tests/tests_scripts'}}
+        name: install (extra) dependencies [pip]
+        run: 'pip install -e .[test-scripts]
 
-      - name: unit testing for geomstats [pytest]
-        if: ${{matrix.test-folder == 'tests/tests_geomstats/'}}
-        run: |
-          pytest --cov-report term -m "not (slow or redundant)" --cov=geomstats ${{matrix.test-folder}}
+          '
+      - id: measurement-7
+        name: Record Measurement After install (extra) dependencies [pip]
+        uses: green-coding-solutions/eco-ci-energy-estimation@862050e4f01f65b1436e5eca18ba4bd85562f0de
+        with:
+          json-output: true
+          label: install (extra) dependencies [pip]
+          task: get-measurement
+      - if: ${{matrix.test-folder == 'tests/tests_geomstats/'}}
+        name: unit testing for geomstats [pytest]
+        run: 'pytest --cov-report term -m "not (slow or redundant)" --cov=geomstats
+          ${{matrix.test-folder}}
 
-      - name: unit testing for geomstats (slow) [pytest]
-        if: ${{matrix.test-folder == 'tests/tests_geomstats/'}}
-        run: |
-          pytest --cov-report term -m "slow and (not redundant)" --cov-append --cov=geomstats ${{matrix.test-folder}}
+          '
+      - id: measurement-9
+        name: Record Measurement After unit testing for geomstats [pytest]
+        uses: green-coding-solutions/eco-ci-energy-estimation@862050e4f01f65b1436e5eca18ba4bd85562f0de
+        with:
+          json-output: true
+          label: unit testing for geomstats [pytest]
+          task: get-measurement
+      - if: ${{matrix.test-folder == 'tests/tests_geomstats/'}}
+        name: unit testing for geomstats (slow) [pytest]
+        run: 'pytest --cov-report term -m "slow and (not redundant)" --cov-append
+          --cov=geomstats ${{matrix.test-folder}}
 
-      - name: unit testing for scripts [pytest]
-        if: ${{matrix.test-folder == 'tests/tests_scripts'}}
-        run: |
-          pytest ${{matrix.test-folder}}
+          '
+      - id: measurement-11
+        name: Record Measurement After unit testing for geomstats (slow) [pytest]
+        uses: green-coding-solutions/eco-ci-energy-estimation@862050e4f01f65b1436e5eca18ba4bd85562f0de
+        with:
+          json-output: true
+          label: unit testing for geomstats (slow) [pytest]
+          task: get-measurement
+      - if: ${{matrix.test-folder == 'tests/tests_scripts'}}
+        name: unit testing for scripts [pytest]
+        run: 'pytest ${{matrix.test-folder}}
 
-      - name: uploading code coverage [codecov]
-        if: ${{ matrix.test-folder == 'tests/tests_geomstats/' }}
+          '
+      - id: measurement-13
+        name: Record Measurement After unit testing for scripts [pytest]
+        uses: green-coding-solutions/eco-ci-energy-estimation@862050e4f01f65b1436e5eca18ba4bd85562f0de
+        with:
+          json-output: true
+          label: unit testing for scripts [pytest]
+          task: get-measurement
+      - if: ${{ matrix.test-folder == 'tests/tests_geomstats/' }}
+        name: uploading code coverage [codecov]
         uses: codecov/codecov-action@v5
         with:
-          token: ${{ secrets.CODECOV_TOKEN }}
-          flags: ${{ matrix.geomstats-backend }}
           fail_ci_if_error: true
+          flags: ${{ matrix.geomstats-backend }}
+          token: ${{ secrets.CODECOV_TOKEN }}
+      - id: display-measurement
+        name: Display Energy Results
+        uses: green-coding-solutions/eco-ci-energy-estimation@862050e4f01f65b1436e5eca18ba4bd85562f0de
+        with:
+          json-output: true
+          task: display-results
+      - name: Save Total Energy Consumption Data
+        run: echo '${{ steps.final-measurement.outputs.data-total-json }}' > total_energy_consumption.json
+      - name: Upload Energy Consumption Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: total-energy-consumption
+          path: total_energy_consumption.json
+    strategy:
+      fail-fast: false
+      matrix:
+        geomstats-backend:
+          - autograd
+          - numpy
+          - pytorch
+        os:
+          - ubuntu-latest
+        python-version:
+          - 3.13
+        test-folder:
+          - tests/tests_geomstats/
+          - tests/tests_scripts

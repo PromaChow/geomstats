@@ -1,51 +1,91 @@
-name: "Docs check and Deployment"
-
+name: Docs check and Deployment
 on:
   push:
-    branches: [main, github-actions-test]
-  pull_request:
-    branches: [main]
+    branches:
+      - main
 
 jobs:
   build:
     runs-on: ${{matrix.os}}
-    strategy:
-      matrix:
-        os: [ubuntu-latest]
-        python-version: [3.13]
-
     steps:
+      - name: Start Energy Measurement
+        uses: green-coding-solutions/eco-ci-energy-estimation@862050e4f01f65b1436e5eca18ba4bd85562f0de
+        with:
+          json-output: true
+          task: start-measurement
       - uses: actions/checkout@v4
       - name: Build using Python ${{matrix.python-version}}
         uses: actions/setup-python@v5
         with:
           python-version: ${{matrix.python-version}}
-
       - uses: actions/cache@v4
         with:
+          key: docs-${{matrix.os}}-${{matrix.python-version}}-${{ hashFiles('pyproject.toml')
+            }}
           path: ~/.cache/pip
-          key: docs-${{matrix.os}}-${{matrix.python-version}}-${{ hashFiles('pyproject.toml') }}
-
       - name: Install dependencies [pip]
-        run: |
-          pip install --upgrade pip setuptools wheel
+        run: 'pip install --upgrade pip setuptools wheel
+
           pip install -e .[doc,opt,backends]
 
+          '
+      - id: measurement-5
+        name: Record Measurement After Install dependencies [pip]
+        uses: green-coding-solutions/eco-ci-energy-estimation@862050e4f01f65b1436e5eca18ba4bd85562f0de
+        with:
+          json-output: true
+          label: Install dependencies [pip]
+          task: get-measurement
       - name: Install Pandoc [apt-get]
-        run: |
-          sudo apt-get -y install pandoc
+        run: 'sudo apt-get -y install pandoc
 
+          '
+      - id: measurement-7
+        name: Record Measurement After Install Pandoc [apt-get]
+        uses: green-coding-solutions/eco-ci-energy-estimation@862050e4f01f65b1436e5eca18ba4bd85562f0de
+        with:
+          json-output: true
+          label: Install Pandoc [apt-get]
+          task: get-measurement
       - name: Generate Docs [Sphinx]
-        run: |
-          sphinx-apidoc -f -o docs/api geomstats
+        run: 'sphinx-apidoc -f -o docs/api geomstats
+
           sphinx-build  -b html -D version=latest -D release=latest docs docs/_build
 
-      - name: Deployement of Docs
+          '
+      - id: measurement-9
+        name: Record Measurement After Generate Docs [Sphinx]
+        uses: green-coding-solutions/eco-ci-energy-estimation@862050e4f01f65b1436e5eca18ba4bd85562f0de
+        with:
+          json-output: true
+          label: Generate Docs [Sphinx]
+          task: get-measurement
+      - if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' &&
+          github.repository == 'geomstats/geomstats' }}
+        name: Deployement of Docs
         uses: JamesIves/github-pages-deploy-action@v4.2.2
-        if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' && github.repository == 'geomstats/geomstats' }}
         with:
           branch: master
-          folder: docs/_build
-          token: ${{ secrets.DOCUMENTATION_KEY }}
-          repository-name: geomstats/geomstats.github.io
           clean: true
+          folder: docs/_build
+          repository-name: geomstats/geomstats.github.io
+          token: ${{ secrets.DOCUMENTATION_KEY }}
+      - id: display-measurement
+        name: Display Energy Results
+        uses: green-coding-solutions/eco-ci-energy-estimation@862050e4f01f65b1436e5eca18ba4bd85562f0de
+        with:
+          json-output: true
+          task: display-results
+      - name: Save Total Energy Consumption Data
+        run: echo '${{ steps.final-measurement.outputs.data-total-json }}' > total_energy_consumption.json
+      - name: Upload Energy Consumption Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: total-energy-consumption
+          path: total_energy_consumption.json
+    strategy:
+      matrix:
+        os:
+          - ubuntu-latest
+        python-version:
+          - 3.13
